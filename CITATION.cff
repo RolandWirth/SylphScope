@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+message: If you use this software, please cite it using the metadata from this file.
+title: SylphScope: Sylph MPA Metagenomics Explorer
+version: 0.3.0-github-ready
+type: software
+authors:
+  - family-names: Wirth
+    given-names: Roland
+abstract: Interactive R Shiny application for exploratory analysis, visualisation and statistical comparison of Sylph MPA taxonomic abundance tables.
+keywords:
+  - metagenomics
+  - microbiome
+  - Sylph
+  - Shiny
+  - microbial ecology

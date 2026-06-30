@@ -1,0 +1,13 @@
+SampleID	Group	Terminal_relative_abundance_sum	Sequence_abundance_sum	Largest_phylum_percent
+Control_S1	Control	100.000000	59592	25.713
+Control_S2	Control	100.000000	54358	30.281
+Control_S3	Control	100.000000	110612	28.958
+Treatment_A_S1	Treatment_A	100.000000	106953	25.135
+Treatment_A_S2	Treatment_A	100.000000	114615	22.791
+Treatment_A_S3	Treatment_A	100.000000	81265	25.611
+Treatment_B_S1	Treatment_B	100.000000	81585	40.737
+Treatment_B_S2	Treatment_B	100.000000	88933	38.806
+Treatment_B_S3	Treatment_B	100.000000	55561	39.627
+Treatment_C_S1	Treatment_C	100.000000	94692	23.175
+Treatment_C_S2	Treatment_C	100.000000	108372	24.083
+Treatment_C_S3	Treatment_C	100.000000	69267	21.754

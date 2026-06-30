@@ -1,0 +1,22 @@
+#SampleID	Treatment_A_S1
+#Taxonomies_used	GTDB_r220_synthetic_terminal_only_example
+#Note	Synthetic terminal-only MPA-like data; relative_abundance sums to 100 per sample. No duplicate parent+child rows.
+clade_name	relative_abundance	sequence_abundance	ANI	Coverage
+d__Bacteria|p__Bacteroidota|c__Bacteroidia|o__Bacteroidales|f__Prevotellaceae|g__Prevotella|s__Prevotella_ruminicola|t__GCF_000025925.1	13.638039	14586	96.7	28.23
+d__Bacteria|p__Bacteroidota|c__Bacteroidia|o__Bacteroidales|f__Prevotellaceae|g__Prevotella|s__Prevotella_copri|t__MAG_PC_002	8.741568	9349	100.0	18.82
+d__Bacteria|p__Bacillota_A|c__Clostridia|o__Lachnospirales|f__Lachnospiraceae|g__Butyrivibrio|s__Butyrivibrio_fibrisolvens|t__DSM_3071	25.135141	26883	97.0	42.11
+d__Bacteria|p__Bacillota|c__Clostridia|o__Oscillospirales|f__Ruminococcaceae|g__Ruminococcus|s__Ruminococcus_flavefaciens|t__FD-1	12.373095	13233	100.0	45.87
+d__Bacteria|p__Bacillota|c__Clostridia|o__Eubacteriales|f__Eubacteriaceae|g__Eubacterium|s__Eubacterium_rectale	7.614607	8144		
+d__Bacteria|p__Actinomycetota|c__Actinomycetia|o__Bifidobacteriales|f__Bifidobacteriaceae|g__Bifidobacterium|s__Bifidobacterium_pseudolongum	4.060069	4342		
+d__Bacteria|p__Proteobacteria|c__Gammaproteobacteria|o__Enterobacterales|f__Enterobacteriaceae|g__Escherichia|s__Escherichia_coli|t__K12_MG1655	0.796141	851	98.5	1.34
+d__Bacteria|p__Proteobacteria|c__Gammaproteobacteria|o__Enterobacterales|f__Enterobacteriaceae|g__Escherichia|s__Escherichia_coli|t__O157_H7	0.248930	266	100.0	0.61
+d__Bacteria|p__Bacillota_C|c__Negativicutes|o__Selenomonadales|f__Selenomonadaceae|g__Selenomonas|s__Selenomonas_ruminantium	6.143022	6570		
+d__Bacteria|p__Spirochaetota|c__Spirochaetia|o__Treponematales|f__Treponemataceae|g__Treponema|s__Treponema_bryantii	4.053607	4335		
+d__Bacteria|p__Fibrobacterota|c__Fibrobacteria|o__Fibrobacterales|f__Fibrobacteraceae|g__Fibrobacter|s__Fibrobacter_succinogenes	5.973282	6389		
+d__Archaea|p__Methanobacteriota|c__Methanobacteria|o__Methanobacteriales|f__Methanobacteriaceae|g__Methanobrevibacter|s__Methanobrevibacter_ruminantium|t__M1	4.408336	4715	100.0	7.28
+d__Archaea|p__Methanobacteriota|c__Methanobacteria|o__Methanobacteriales|f__Methanobacteriaceae|g__Methanobrevibacter|s__Methanobrevibacter_smithii	1.930906	2065		
+d__Archaea|p__Halobacteriota|c__Methanosarcinia|o__Methanosarcinales|f__Methanosarcinaceae|g__Methanosarcina|s__Methanosarcina_barkeri|t__Fusaro	1.221341	1306	98.7	3.58
+d__Bacteria|p__Desulfobacterota|c__Desulfovibrionia|o__Desulfovibrionales|f__Desulfovibrionaceae|g__Desulfovibrio|s__Desulfovibrio_desulfuricans|t__ATCC_27774	0.859299	919	100.0	3.66
+d__Bacteria|p__Verrucomicrobiota|c__Kiritimatiellae|o__WCHB1-41|f__WCHB1-41|g__Kiritimatiella|s__Kiritimatiella_glycovorans	1.094381	1170		
+d__Bacteria|p__Synergistota|c__Synergistia|o__Synergistales|f__Synergistaceae|g__Aminobacterium|s__Aminobacterium_colombiense	1.186495	1269		
+d__Bacteria|p__Thermotogota|c__Thermotogae|o__Petrotogales|f__Petrotogaceae|g__Petrotoga|s__Petrotoga_mobilis	0.521741	561		
