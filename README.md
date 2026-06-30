@@ -1,3 +1,5 @@
+<img width="1164" height="368" alt="image" src="https://github.com/user-attachments/assets/c2c522bf-684d-4926-a1ee-99dd11107907" />
+
 # SylphScope - Sylph MPA Explorer
 
 Interactive R Shiny application for exploratory analysis, visualisation and statistical comparison of Sylph MPA taxonomic abundance tables.
