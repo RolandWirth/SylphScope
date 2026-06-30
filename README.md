@@ -1,4 +1,4 @@
-# Sylph MPA Explorer
+# SylphScope - Sylph MPA Explorer
 
 Interactive R Shiny application for exploratory analysis, visualisation and statistical comparison of Sylph MPA taxonomic abundance tables.
 
