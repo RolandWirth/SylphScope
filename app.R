@@ -10,7 +10,7 @@ AUTO_INSTALL_PACKAGES <- TRUE
 
 cran_packages <- c(
   "shiny", "bslib", "tidyverse", "vegan", "DT", "plotly", "pals",
-  "rmarkdown", "dendextend", "forcats", "gridExtra", "MASS", "htmlwidgets"
+  "rmarkdown", "dendextend", "forcats", "gridExtra", "MASS", "htmlwidgets", "RColorBrewer", "Polychrome"
 )
 bioc_packages <- c("phyloseq")
 
@@ -57,16 +57,18 @@ suppressPackageStartupMessages({
   library(gridExtra)
   library(MASS)
   library(htmlwidgets)
+  library(RColorBrewer)
+  library(Polychrome)
 })
 
 options(shiny.maxRequestSize = 500 * 1024^2)
 options(width = 120)
-APP_VERSION <- "0.3.0-github-ready"
-APP_NAME <- "Sylph MPA Metagenomics Explorer"
+APP_VERSION <- "0.3.3-beta"
+APP_NAME <- "SylphScope"
 
 ui <- fluidPage(
   theme = bslib::bs_theme(bootswatch = "flatly"),
-  titlePanel("Sylph MPA Metagenomics Explorer"),
+  titlePanel("SylphScope - Sylph MPA Metagenomics Explorer"),
 
   sidebarLayout(
     sidebarPanel(
@@ -250,9 +252,72 @@ server <- function(input, output, session) {
   }
 
   group_palette <- function(groups) {
+    # Consistent group colours across PCA/ordination, dendrograms and biomarker plots.
+    # Hybrid microbiome-friendly categorical palette:
+    #   <= 9 groups: ColorBrewer Set1
+    #   10-20 groups: Polychrome palette36
+    #   > 20 groups: Polychrome palette36 extended by interpolation
     groups <- sort(unique(as.character(groups)))
-    cols <- grDevices::hcl.colors(max(length(groups), 1), palette = "Dark 3")
-    setNames(cols[seq_along(groups)], groups)
+    n <- length(groups)
+
+    if (n == 0) {
+      return(character())
+    }
+
+    if (n <= 9) {
+      cols <- RColorBrewer::brewer.pal(9, "Set1")[seq_len(n)]
+    } else if (n <= 20) {
+      cols <- Polychrome::palette36.colors(n)
+    } else {
+      cols <- grDevices::colorRampPalette(Polychrome::palette36.colors(36))(n)
+    }
+
+    setNames(cols, groups)
+  }
+
+  sample_shape_palette <- function(samples) {
+    # Use non-filled point symbols only. Filled shapes (21-25) can cause ggplotly
+    # to create misleading rainbow-like colours when shape is mapped to SampleID.
+    samples <- sort(unique(as.character(samples)))
+    shapes <- c(0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 3, 4)
+    setNames(rep(shapes, length.out = length(samples)), samples)
+  }
+
+  make_ellipse_df <- function(df, x = "Axis.1", y = "Axis.2", group = "Group", level = 0.95, segments = 100) {
+    # Manual ellipse coordinates are more reliable after ggplotly conversion than stat_ellipse().
+    df <- df %>% filter(!is.na(.data[[x]]), !is.na(.data[[y]]), !is.na(.data[[group]]))
+    groups <- df %>% count(.data[[group]], name = "n") %>% filter(n >= 3) %>% pull(.data[[group]])
+    if (length(groups) == 0) return(tibble())
+
+    purrr::map_dfr(groups, function(g) {
+      sub <- df %>% filter(.data[[group]] == g)
+      mat <- as.matrix(sub[, c(x, y)])
+      if (nrow(mat) < 3) return(tibble())
+      cov_mat <- stats::cov(mat, use = "complete.obs")
+      if (any(!is.finite(cov_mat)) || det(cov_mat) <= .Machine$double.eps) return(tibble())
+      centre <- colMeans(mat, na.rm = TRUE)
+      eig <- eigen(cov_mat)
+      theta <- seq(0, 2 * pi, length.out = segments)
+      circle <- rbind(cos(theta), sin(theta))
+      radius <- sqrt(stats::qchisq(level, df = 2))
+      ellipse <- t(centre + radius * eig$vectors %*% diag(sqrt(pmax(eig$values, 0)), 2) %*% circle)
+      tibble(Axis.1 = ellipse[, 1], Axis.2 = ellipse[, 2], Group = as.character(g))
+    })
+  }
+
+  add_group_ellipses <- function(p, df, x = "Axis.1", y = "Axis.2", group = "Group") {
+    ellipse_df <- make_ellipse_df(df, x = x, y = y, group = group)
+    if (nrow(ellipse_df) == 0) return(p)
+
+    p + geom_path(
+      data = ellipse_df,
+      aes(x = Axis.1, y = Axis.2, colour = Group, group = Group),
+      linewidth = 0.8,
+      linetype = 2,
+      alpha = 0.9,
+      show.legend = FALSE,
+      inherit.aes = FALSE
+    )
   }
 
   taxon_palette <- function(n) {
@@ -497,13 +562,13 @@ server <- function(input, output, session) {
       fill = TopGroup,
       text = paste0(
         "Taxon: ", TaxonName,
-        "<br>Top group: ", TopGroup,
+        "<br>Enriched group: ", TopGroup,
         "<br>LDA-like score: ", signif(lda_score, 3),
         "<br>KW FDR: ", signif(kw_padj, 3),
         "<br>Wilcoxon FDR: ", signif(wilcox_padj, 3)
       )
     )) +
-      geom_col() +
+      geom_col(colour = "grey25", linewidth = 0.2) +
       coord_flip() +
       theme_bw() +
       scale_fill_manual(values = group_palette(dat$TopGroup)) +
@@ -561,7 +626,24 @@ server <- function(input, output, session) {
         df_pca <- data.frame(Axis.1 = pca$x[, 1], Axis.2 = pca$x[, 2], SampleID = rownames(pca$x), Group = sample_data(v$ps)$Group)
         title <- "Hellinger PCA"; xlab <- paste0("PC1 (", var_exp[1], "%)"); ylab <- paste0("PC2 (", var_exp[2], "%)")
       }
-      return(ggplot(df_pca, aes(Axis.1, Axis.2, color = Group, label = SampleID)) + geom_point(size = 4) + geom_text(vjust = -1.2, size = 3, show.legend = FALSE) + theme_bw() + scale_color_manual(values = group_palette(df_pca$Group)) + labs(title = title, x = xlab, y = ylab))
+      p <- ggplot(df_pca, aes(
+        x = Axis.1,
+        y = Axis.2,
+        color = Group,
+        shape = SampleID,
+        label = SampleID
+      )) +
+        geom_point(size = 4, stroke = 1.1) +
+        geom_text(vjust = -1.2, size = 3, show.legend = FALSE) +
+        theme_bw() +
+        scale_color_manual(values = group_palette(df_pca$Group), name = "Group") +
+        scale_shape_manual(values = sample_shape_palette(df_pca$SampleID), name = "SampleID") +
+        guides(
+          colour = guide_legend(order = 1, override.aes = list(shape = 16, size = 4)),
+          shape = guide_legend(order = 2, override.aes = list(colour = "grey25", size = 3))
+        ) +
+        labs(title = title, x = xlab, y = ylab)
+      return(add_group_ellipses(p, df_pca))
     }
 
     if (plot_id == "dendrogram") {
@@ -570,7 +652,19 @@ server <- function(input, output, session) {
       dend_data <- dendextend::as.ggdend(as.dendrogram(hc))
       meta <- data.frame(SampleID = rownames(sample_data(v$ps)), Group = sample_data(v$ps)$Group)
       nodes <- dend_data$labels %>% left_join(meta, by = c("label" = "SampleID"))
-      return(ggplot() + geom_segment(data = dend_data$segments, aes(x = x, y = y, xend = xend, yend = yend)) + geom_point(data = nodes, aes(x = x, y = y, color = Group), size = 3) + scale_color_manual(values = group_palette(nodes$Group)) + theme_void() + labs(title = "Bray-Curtis dendrogram, average linkage"))
+      return(
+        ggplot() +
+          geom_segment(data = dend_data$segments, aes(x = x, y = y, xend = xend, yend = yend)) +
+          geom_point(data = nodes, aes(x = x, y = y, color = Group, shape = label), size = 3, stroke = 1.1) +
+          scale_color_manual(values = group_palette(nodes$Group), name = "Group") +
+          scale_shape_manual(values = sample_shape_palette(nodes$label), name = "SampleID") +
+          guides(
+            colour = guide_legend(order = 1, override.aes = list(shape = 16, size = 4)),
+            shape = guide_legend(order = 2, override.aes = list(colour = "grey25", size = 3))
+          ) +
+          theme_void() +
+          labs(title = "Bray-Curtis dendrogram, average linkage")
+      )
     }
 
     if (plot_id == "biomarker_phylum") { req(v$biomarker_table); return(make_lefse_plot_gg(v$biomarker_table, "Phylum", input$top_n, FALSE)) }
@@ -870,12 +964,25 @@ server <- function(input, output, session) {
       ylab <- paste0("PC2 (", var_exp[2], "%)")
     }
 
-    p <- ggplot(df_pca, aes(x = Axis.1, y = Axis.2, color = Group, text = SampleID)) +
-      geom_point(size = 4) +
+    p <- ggplot(df_pca, aes(
+      x = Axis.1,
+      y = Axis.2,
+      color = Group,
+      shape = SampleID,
+      text = paste0("Sample: ", SampleID, "<br>Group: ", Group)
+    )) +
+      geom_point(size = 4, stroke = 1.1) +
       geom_text(aes(label = SampleID), vjust = -1.2, size = 3, show.legend = FALSE) +
       theme_bw() +
-      scale_color_manual(values = group_palette(df_pca$Group)) +
+      scale_color_manual(values = group_palette(df_pca$Group), name = "Group") +
+      scale_shape_manual(values = sample_shape_palette(df_pca$SampleID), name = "SampleID") +
+      guides(
+        colour = guide_legend(order = 1, override.aes = list(shape = 16, size = 4)),
+        shape = guide_legend(order = 2, override.aes = list(colour = "grey25", size = 3))
+      ) +
       labs(title = title, x = xlab, y = ylab)
+
+    p <- add_group_ellipses(p, df_pca)
 
     ggplotly(p, tooltip = "text")
   })
@@ -895,8 +1002,24 @@ server <- function(input, output, session) {
 
     p <- ggplot() +
       geom_segment(data = dend_data$segments, aes(x = x, y = y, xend = xend, yend = yend)) +
-      geom_point(data = nodes, aes(x = x, y = y, color = Group, text = label), size = 3) +
-      scale_color_manual(values = group_palette(nodes$Group)) +
+      geom_point(
+        data = nodes,
+        aes(
+          x = x,
+          y = y,
+          color = Group,
+          shape = label,
+          text = paste0("Sample: ", label, "<br>Group: ", Group)
+        ),
+        size = 3,
+        stroke = 1
+      ) +
+      scale_color_manual(values = group_palette(nodes$Group), name = "Group") +
+      scale_shape_manual(values = sample_shape_palette(nodes$label), name = "SampleID") +
+      guides(
+        colour = guide_legend(order = 1, override.aes = list(shape = 16, size = 4)),
+        shape = guide_legend(order = 2, override.aes = list(colour = "grey25", size = 3))
+      ) +
       theme_void() +
       labs(title = "Bray-Curtis dendrogram, average linkage")
 
