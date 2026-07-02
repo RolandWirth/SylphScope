@@ -63,7 +63,7 @@ suppressPackageStartupMessages({
 
 options(shiny.maxRequestSize = 500 * 1024^2)
 options(width = 120)
-APP_VERSION <- "0.3.3-beta"
+APP_VERSION <- "0.3.4-beta"
 APP_NAME <- "SylphScope"
 
 ui <- fluidPage(
@@ -108,7 +108,7 @@ ui <- fluidPage(
       h4("3. Biomarker Filters"),
       sliderInput("min_prevalence", "Minimum prevalence (% samples):", min = 0, max = 100, value = 10, step = 5),
       numericInput("min_mean_count", "Minimum mean normalized count:", value = 0, min = 0, step = 1),
-      numericInput("lda_cutoff", "Minimum LDA-like effect size:", value = 0, min = 0, step = 0.1),
+      numericInput("lda_cutoff", "Minimum biomarker score:", value = 0, min = 0, step = 0.1),
       hr(),
 
       h4("4. Analysis"),
@@ -178,17 +178,19 @@ ui <- fluidPage(
 
         tabPanel(
           "Beta Diversity", br(),
+          uiOutput("ordination_description"),
           uiOutput("pca_ui"), hr(),
           h4("PERMANOVA"),
           DTOutput("permanova_table"),
           hr(),
           h4("Interactive Bray-Curtis Dendrogram"),
+          helpText("The Bray-Curtis dendrogram clusters samples using Bray-Curtis dissimilarities and average-linkage hierarchical clustering. Samples closer together in the tree have more similar taxonomic profiles."),
           uiOutput("dendro_ui")
         ),
 
         tabPanel(
           "Biomarkers", br(),
-          helpText("Biomarker discovery uses normalized read counts with Kruskal-Wallis screening, one-vs-rest Wilcoxon validation, and LDA-like effect-size estimation. This is LEfSe-like, not the original LEfSe implementation."),
+          helpText("Biomarker score is a LEfSe-inspired effect-size metric calculated from normalized abundance profiles following statistical screening by Kruskal-Wallis and pairwise Wilcoxon tests. The score is intended for ranking discriminatory taxa and is not identical to the LDA score produced by the original LEfSe algorithm."),
           h4("Phylum-level biomarkers"),
           uiOutput("lefse_phylum_ui"),
           hr(),
@@ -317,6 +319,41 @@ server <- function(input, output, session) {
       alpha = 0.9,
       show.legend = FALSE,
       inherit.aes = FALSE
+    )
+  }
+
+  get_pcoa_axis_labels <- function(ord) {
+    # Extract percentage of variation explained by the first two PCoA axes.
+    # phyloseq::ordinate(method = "PCoA") usually stores this in ord$values.
+    pct <- c(NA_real_, NA_real_)
+
+    if (!is.null(ord$values)) {
+      vals <- ord$values
+
+      if (is.data.frame(vals) && "Relative_eig" %in% colnames(vals)) {
+        pct <- vals$Relative_eig[seq_len(min(2, nrow(vals)))]
+      } else if (is.data.frame(vals) && "Eigenvalues" %in% colnames(vals)) {
+        eig <- vals$Eigenvalues
+        denom <- sum(eig[eig > 0], na.rm = TRUE)
+        if (is.finite(denom) && denom > 0) {
+          pct <- eig[seq_len(min(2, length(eig)))] / denom
+        }
+      } else if (is.numeric(vals)) {
+        denom <- sum(vals[vals > 0], na.rm = TRUE)
+        if (is.finite(denom) && denom > 0) {
+          pct <- vals[seq_len(min(2, length(vals)))] / denom
+        }
+      }
+    }
+
+    pct <- as.numeric(pct)
+    if (all(is.finite(pct), na.rm = TRUE) && max(pct, na.rm = TRUE) <= 1.5) {
+      pct <- pct * 100
+    }
+
+    c(
+      ifelse(is.finite(pct[1]), paste0("Axis 1 (", round(pct[1], 1), "%)"), "Axis 1"),
+      ifelse(is.finite(pct[2]), paste0("Axis 2 (", round(pct[2], 1), "%)"), "Axis 2")
     )
   }
 
@@ -563,7 +600,7 @@ server <- function(input, output, session) {
       text = paste0(
         "Taxon: ", TaxonName,
         "<br>Enriched group: ", TopGroup,
-        "<br>LDA-like score: ", signif(lda_score, 3),
+        "<br>Biomarker score: ", signif(lda_score, 3),
         "<br>KW FDR: ", signif(kw_padj, 3),
         "<br>Wilcoxon FDR: ", signif(wilcox_padj, 3)
       )
@@ -572,7 +609,12 @@ server <- function(input, output, session) {
       coord_flip() +
       theme_bw() +
       scale_fill_manual(values = group_palette(dat$TopGroup)) +
-      labs(title = paste(rank, "biomarkers"), x = NULL, y = "LDA-like effect size", fill = "Enriched group")
+      labs(
+        title = ifelse(rank == "Phylum", "Differentially abundant phyla", "Differentially abundant species"),
+        x = NULL,
+        y = "Biomarker score",
+        fill = "Enriched group"
+      )
   }
 
   make_static_plot <- function(plot_id) {
@@ -618,7 +660,8 @@ server <- function(input, output, session) {
         ord <- ordinate(v$ps, method = "PCoA", distance = "bray")
         df_pca <- data.frame(ord$vectors[, 1:2, drop = FALSE], SampleID = rownames(ord$vectors), Group = sample_data(v$ps)$Group)
         colnames(df_pca)[1:2] <- c("Axis.1", "Axis.2")
-        title <- "Bray-Curtis PCoA"; xlab <- "Axis 1"; ylab <- "Axis 2"
+        pcoa_labels <- get_pcoa_axis_labels(ord)
+        title <- "Bray-Curtis PCoA"; xlab <- pcoa_labels[1]; ylab <- pcoa_labels[2]
       } else {
         otu <- as(otu_table(v$ps), "matrix"); if (taxa_are_rows(v$ps)) otu <- t(otu)
         pca <- prcomp(vegan::decostand(otu, method = "hellinger"), center = TRUE, scale. = FALSE)
@@ -847,6 +890,14 @@ server <- function(input, output, session) {
     })
   })
 
+  output$ordination_description <- renderUI({
+    if (input$ordination_method == "bray_pcoa") {
+      helpText("Bray-Curtis PCoA is based on pairwise Bray-Curtis dissimilarities and is suitable for visualising compositional differences in taxonomic abundance profiles. Axis percentages indicate the proportion of variation represented by each PCoA axis.")
+    } else {
+      helpText("Hellinger PCA applies a Hellinger transformation to abundance profiles before principal component analysis. It is often useful for community composition data because it reduces the influence of very dominant taxa and many zeros.")
+    }
+  })
+
   output$phylum_ui       <- renderUI({ plotlyOutput("phylum_bar", height = input$plot_height, width = paste0(input$plot_width, "%")) })
   output$species_ui      <- renderUI({ plotlyOutput("species_heatmap", height = max(input$plot_height, input$top_n * 22), width = paste0(input$plot_width, "%")) })
   output$pca_ui          <- renderUI({ plotlyOutput("pca_plot", height = input$plot_height, width = paste0(input$plot_width, "%")) })
@@ -949,9 +1000,10 @@ server <- function(input, output, session) {
       ord <- ordinate(v$ps, method = "PCoA", distance = "bray")
       df_pca <- data.frame(ord$vectors[, 1:2, drop = FALSE], SampleID = rownames(ord$vectors), Group = sample_data(v$ps)$Group)
       colnames(df_pca)[1:2] <- c("Axis.1", "Axis.2")
+      pcoa_labels <- get_pcoa_axis_labels(ord)
       title <- "Bray-Curtis PCoA"
-      xlab <- "Axis 1"
-      ylab <- "Axis 2"
+      xlab <- pcoa_labels[1]
+      ylab <- pcoa_labels[2]
     } else {
       otu <- as(otu_table(v$ps), "matrix")
       if (taxa_are_rows(v$ps)) otu <- t(otu)
